@@ -3,9 +3,9 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Seller {
-    private final static int NUMBER_OF_ATTEMPTS = 3;
+    private static final int COUNT_CARS = 10;
+    private static final int DIVISOR = 3;
     private final static int TIME_SLEEP = 1000;
-    private final static int MAX_COUNT_CAR = 10;
 
     private boolean availableCar;
 
@@ -15,31 +15,19 @@ public class Seller {
     public void sellCar() {
         lock.lock();
         try {
-            System.out.println(Thread.currentThread().getName() + " решил купить автомобиль.");
+            System.out.println(Thread.currentThread().getName() + " зашел в автосалон.");
+            while (!availableCar) {
+                System.out.println("Ответ автосалона для " + Thread.currentThread().getName() +
+                        " - Машин нет.");
 
-            carCondition.await();
-
-            if (availableCar) {
-                for (int i = 0; i < NUMBER_OF_ATTEMPTS; i++) {
-                    if (Main.countCar == MAX_COUNT_CAR) {
-                        return;
-                    }
-                    System.out.println(Thread.currentThread().getName() + " зашёл в автосалон.");
-
-                    if (!Main.availableCar) {
-                        System.out.println(Thread.currentThread().getName() + " - Машин нет. Ждите когда привезут.");
-                        Thread.sleep(TIME_SLEEP);
-
-                    } else {
-                        Thread.sleep(TIME_SLEEP);
-                        System.out.println("Производитель Tesla выпустил 1 авто.");
-                        System.out.println(Thread.currentThread().getName() + " уехал на новеньком авто!");
-                        Main.availableCar = false;
-                        Main.countCar++;
-                        Thread.sleep(TIME_SLEEP);
-                    }
-                }
+                carCondition.await();
             }
+            Thread.sleep(TIME_SLEEP);
+            System.out.println(Thread.currentThread().getName() + " уехал на новеньком авто!");
+            availableCar = false;
+
+            carCondition.signal();
+
         } catch (InterruptedException e) {
             e.printStackTrace();
         } finally {
@@ -47,16 +35,33 @@ public class Seller {
         }
     }
 
-    //Здесь даём старт продаж.
     public void receiveCar() {
         lock.lock();
         try {
-            while (!Main.availableCar) {
-                Thread.sleep(TIME_SLEEP);
-            }
-            availableCar = true;
+            int countCar = 0;
+            long current;
+            long finish;
+            long start = System.currentTimeMillis();
 
-            carCondition.signalAll();
+            while (countCar < COUNT_CARS) {
+                Thread.sleep(TIME_SLEEP);
+                finish = System.currentTimeMillis();
+                current = (finish - start) / TIME_SLEEP;
+
+                if (current % DIVISOR == 0) {
+                    availableCar = true;
+                    System.out.println("Производитель Tesla выпустил 1 авто.");
+                    countCar++;
+
+                    carCondition.signalAll();
+
+                    carCondition.await();
+
+                } else {
+                    availableCar = false;
+                }
+            }
+
         } catch (InterruptedException e) {
             e.printStackTrace();
         } finally {
